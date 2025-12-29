@@ -26,6 +26,148 @@ function InventoryMovementCreate() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
+  // ---------- Helpers ----------
+  const getProductName = (d, index) => d?.product?.label || `Línea #${index + 1}`;
+
+  const joinNames = (names) => {
+    if (names.length <= 1) return names[0] || "";
+    if (names.length === 2) return `${names[0]} y ${names[1]}`;
+    return `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
+  };
+
+  const humanizeBackendError = (data) => {
+    const raw = data?.backendMessage || data?.message || data?.error || "";
+
+    if (data?.errors && !Array.isArray(data.errors) && typeof data.errors === "object") {
+      const messages = Object.entries(data.errors).map(([path, msg]) => {
+        const m = String(path).match(/^(entryDetails|exitDetails)\[(\d+)\]\.(.+)$/);
+        if (!m) return String(msg);
+
+        const idx = Number(m[2]);
+        const field = m[3];
+        const name = getProductName(details[idx], idx);
+
+        if (field === "productId") return `${name}: selecciona un producto`;
+        if (field === "quantity") return `${name}: la cantidad debe ser mayor que 0`;
+        if (field === "unitCost") return `${name}: el costo unitario debe ser mayor o igual a 0`;
+        if (field === "sellPriceUnit") return `${name}: el precio unitario de venta debe ser mayor o igual a 0`;
+
+        return `${name}: ${String(msg)}`;
+      });
+
+      return messages[0] || "Error de validación";
+    }
+
+    if (Array.isArray(data?.errors)) {
+      const msgs = data.errors.map((e) => String(e));
+      return msgs[0] || "Error de validación";
+    }
+
+    const parts = String(raw).split(",").map((p) => p.trim()).filter(Boolean);
+    const mapped = parts.map((p) => {
+      const m = p.match(/^(entryDetails|exitDetails)\[(\d+)\]\.(.+?)\s*:\s*(.*)$/);
+      if (!m) return p;
+
+      const idx = Number(m[2]);
+      const field = m[3];
+      const name = getProductName(details[idx], idx);
+
+      if (field === "productId") return `${name}: selecciona un producto`;
+      if (field === "quantity") return `${name}: la cantidad debe ser mayor que 0`;
+      if (field === "unitCost") return `${name}: el costo unitario debe ser mayor o igual a 0`;
+      if (field === "sellPriceUnit") return `${name}: el precio unitario de venta debe ser mayor o igual a 0`;
+
+      return `${name}: ${m[4]}`;
+    });
+
+    return mapped[0] || raw || "Error desconocido del servidor";
+  };
+
+  // ---------- Validación FRONT (solo errores generales, en orden) ----------
+  const validateBeforeSubmit = () => {
+    if (!warehouse) {
+      setError("Debes seleccionar un almacén.");
+      return false;
+    }
+
+    const missingProduct = details.some((d) => !d.product?.value);
+    if (missingProduct) {
+      setError("Debes seleccionar un producto en cada línea.");
+      return false;
+    }
+
+    // ✅ Duplicados (por seguridad, aunque ya bloqueamos en el select)
+    const seen = new Set();
+    for (let i = 0; i < details.length; i++) {
+      const id = details[i]?.product?.value;
+      if (id == null) continue;
+      if (seen.has(id)) {
+        const name = details[i]?.product?.label || "Ese producto";
+        setError(`El producto "${name}" ya está añadido. No puedes repetirlo.`);
+        return false;
+      }
+      seen.add(id);
+    }
+
+    const badQty = details
+      .map((d, i) => ({ d, i }))
+      .filter(({ d }) => {
+        const q = Number(d.quantity);
+        return !Number.isFinite(q) || q <= 0;
+      })
+      .map(({ d, i }) => getProductName(d, i));
+
+    if (badQty.length) {
+      if (badQty.length === 1) {
+        setError(`${badQty[0]}: la cantidad debe ser mayor que 0.`);
+      } else {
+        setError(`La cantidad debe ser mayor que 0 en: ${joinNames(badQty)}.`);
+      }
+      return false;
+    }
+
+    if (movementType === "IN") {
+      const badCost = details
+        .map((d, i) => ({ d, i }))
+        .filter(({ d }) => {
+          const c = Number(d.unitCost);
+          return !Number.isFinite(c) || c < 0;
+        })
+        .map(({ d, i }) => getProductName(d, i));
+
+      if (badCost.length) {
+        if (badCost.length === 1) {
+          setError(`${badCost[0]}: el costo unitario debe ser mayor o igual a 0.`);
+        } else {
+          setError(`El costo unitario debe ser mayor o igual a 0 en: ${joinNames(badCost)}.`);
+        }
+        return false;
+      }
+    }
+
+    if (movementType === "OUT") {
+      const badSell = details
+        .map((d, i) => ({ d, i }))
+        .filter(({ d }) => {
+          const p = Number(d.sellPriceUnit);
+          return !Number.isFinite(p) || p < 0;
+        })
+        .map(({ d, i }) => getProductName(d, i));
+
+      if (badSell.length) {
+        if (badSell.length === 1) {
+          setError(`${badSell[0]}: el precio unitario de venta debe ser mayor o igual a 0.`);
+        } else {
+          setError(`El precio unitario de venta debe ser mayor o igual a 0 en: ${joinNames(badSell)}.`);
+        }
+        return false;
+      }
+    }
+
+    setError(null);
+    return true;
+  };
+
   // --- Cargar productos y almacenes ---
   useEffect(() => {
     if (!token) return navigate("/login");
@@ -64,6 +206,19 @@ function InventoryMovementCreate() {
   // --- Cambiar un valor de detalle ---
   const handleDetailChange = (index, field, value) => {
     const updated = [...details];
+
+    // ✅ Bloquear producto duplicado en otra línea
+    if (field === "product") {
+      const newId = value?.value;
+      if (newId != null) {
+        const duplicated = details.some((d, i) => i !== index && d?.product?.value === newId);
+        if (duplicated) {
+          setError(`El producto "${value.label}" ya está añadido. Elige otro.`);
+          return; // no actualiza la línea
+        }
+      }
+    }
+
     updated[index][field] = value;
     setDetails(updated);
   };
@@ -74,13 +229,12 @@ function InventoryMovementCreate() {
     setError(null);
     setLoading(true);
 
-    if (!warehouse) {
-      setError("Debes seleccionar un almacén");
+    const ok = validateBeforeSubmit();
+    if (!ok) {
       setLoading(false);
       return;
     }
 
-    // --- DTO adaptado al backend ---
     const dto = {
       movementType,
       referenceDocument,
@@ -121,17 +275,11 @@ function InventoryMovementCreate() {
         try {
           data = JSON.parse(text);
         } catch {
-          data = { message: text }; // Si no es JSON, mostramos texto plano
+          data = { message: text };
         }
 
         if (!res.ok) {
-          const backendMessage =
-            data.backendMessage ||
-            data.message ||
-            data.error ||
-            (data.errors ? data.errors.join(", ") : "") ||
-            "Error desconocido del servidor";
-          throw new Error(backendMessage);
+          throw new Error(humanizeBackendError(data));
         }
 
         return data;
@@ -139,6 +287,17 @@ function InventoryMovementCreate() {
       .then(() => navigate("/inventory-movements"))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+  };
+
+  // ✅ Opcional: lista de productos disponibles por línea (quita los usados en otras líneas)
+  const getOptionsForRow = (rowIndex) => {
+    const usedIds = new Set(
+      details
+        .filter((_, i) => i !== rowIndex)
+        .map((d) => d.product?.value)
+        .filter((v) => v != null)
+    );
+    return products.filter((p) => !usedIds.has(p.value));
   };
 
   return (
@@ -195,7 +354,7 @@ function InventoryMovementCreate() {
             <CCol md={3}>
               <label>Producto</label>
               <Select
-                options={products}
+                options={getOptionsForRow(i)}   // ✅ evita duplicados en el dropdown
                 value={d.product}
                 onChange={(val) => handleDetailChange(i, "product", val)}
               />

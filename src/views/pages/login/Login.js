@@ -12,27 +12,33 @@ import {
   CInputGroup,
   CInputGroupText,
   CRow,
+  CSpinner,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
 import { cilLockLocked, cilUser } from '@coreui/icons'
 import { login } from '../../../utils/auth'
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const navigate = useNavigate() // Para redirigir después del login
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
+    if (loading) return
+
+    setError('')
+    setLoading(true)
     try {
-      await login(email, password);
-      // Redirige a la página protegida
-      navigate('/');
+      await login(email, password)
+      navigate('/')
     } catch (err) {
-      setError(err.message);
+      setError(err?.message || 'Error al iniciar sesión')
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <div className="bg-body-tertiary min-vh-100 d-flex flex-row align-items-center">
@@ -44,7 +50,7 @@ const Login = () => {
                 <CCardBody>
                   <CForm onSubmit={handleSubmit}>
                     <h1>Login</h1>
-                    <p className="text-body-secondary">Inicia sesion en tu cuenta!</p>
+                    <p className="text-body-secondary">Inicia sesión en tu cuenta</p>
 
                     {error && <p style={{ color: 'red' }}>{error}</p>}
 
@@ -58,9 +64,9 @@ const Login = () => {
                         autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        disabled={loading}
                       />
-
-                      </CInputGroup>
+                    </CInputGroup>
 
                     <CInputGroup className="mb-4">
                       <CInputGroupText>
@@ -72,17 +78,30 @@ const Login = () => {
                         autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        disabled={loading}
                       />
                     </CInputGroup>
 
-                    <CRow>
+                    <CRow className="align-items-center">
                       <CCol xs={6}>
-                        <CButton type="submit" color="primary" className="px-4">
-                          Login
+                        <CButton
+                          type="submit"
+                          color="primary"
+                          className="px-4"
+                          disabled={loading}
+                        >
+                          {loading ? (
+                            <>
+                              <CSpinner size="sm" className="me-2" />
+                              Entrando...
+                            </>
+                          ) : (
+                            'Login'
+                          )}
                         </CButton>
                       </CCol>
                       <CCol xs={6} className="text-right">
-                        <CButton color="link" className="px-0">
+                        <CButton color="link" className="px-0" disabled={loading}>
                           Forgot password?
                         </CButton>
                       </CCol>
@@ -94,19 +113,16 @@ const Login = () => {
               <CCard className="text-white bg-primary py-5" style={{ width: '44%' }}>
                 <CCardBody className="text-center">
                   <div>
-                    <h2>Resgistro</h2>
-                    <p>
-                      Si aun no tienes una cuenta, puedes create una en menos de 2 minutos por aqui!
-                    </p>
+                    <h2>Registro</h2>
+                    <p>Si aún no tienes una cuenta, puedes crear una en menos de 2 minutos.</p>
                     <Link to="/register">
                       <CButton color="primary" className="mt-3" active tabIndex={-1}>
-                        Registrate ahora!
+                        ¡Regístrate ahora!
                       </CButton>
                     </Link>
                   </div>
                 </CCardBody>
               </CCard>
-
             </CCardGroup>
           </CCol>
         </CRow>
