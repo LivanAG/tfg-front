@@ -174,7 +174,7 @@ function CategoriesList() {
       />
 
       <div style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
-        <CButton color="success" size="sm" onClick={() => navigate("/category/create")}>
+        <CButton color="success" size="sm" onClick={() => navigate("/categories/create")}>
           Crear Categoría
         </CButton>
 

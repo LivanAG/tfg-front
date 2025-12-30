@@ -55,7 +55,7 @@ const routes = [
 
   // Categories
   { path: '/categories', name: 'Categories', element: Categories },
-  { path: '/category/create', name: 'CategoryCreate', element: CategoryCreate },
+  { path: '/categories/create', name: 'CategoryCreate', element: CategoryCreate },
 
   
   

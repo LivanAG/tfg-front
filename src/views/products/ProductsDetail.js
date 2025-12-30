@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"; 
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell,
@@ -112,19 +112,27 @@ function ProductDetail() {
         <h4>Detalles técnicos</h4>
         {details ? (
           <>
-            <p><strong>Peso:</strong> {details.weight} {details.unitOfMeasure}</p>
-            <p><strong>Dimensiones:</strong> Ancho: {details.width} cm | Alto: {details.height} cm | Profundidad: {details.depth} cm</p>
-            <CButton color="primary" size="sm" onClick={() => navigate(`/products/${id}/details/edit`)}>Editar Detalles Técnicos</CButton>
+            {/* ✅ NUEVO MODELO */}
+            <p><strong>Peso:</strong> {details.weight} {details.weightUnit || ""}</p>
+            <p>
+              <strong>Dimensiones:</strong>{" "}
+              Largo: {details.length} {details.dimensionUnit || ""} |{" "}
+              Ancho: {details.width} {details.dimensionUnit || ""}
+            </p>
+
+            <CButton color="primary" size="sm" onClick={() => navigate(`/products/${id}/details/edit`)}>
+              Editar Detalles Técnicos
+            </CButton>
           </>
         ) : (
           <>
             <p>No hay detalles técnicos.</p>
-            <CButton color="success" size="sm" onClick={() => navigate(`/products/${id}/details/add`)}>Agregar Detalles Técnicos</CButton>
+            <CButton color="success" size="sm" onClick={() => navigate(`/products/${id}/details/add`)}>
+              Agregar Detalles Técnicos
+            </CButton>
           </>
         )}
       </div>
-
-
 
       {/* --- STOCKS --- */}
       <div style={{ marginBottom: "1.5rem" }}>

@@ -12,10 +12,10 @@ function ProductDetailsForm() {
 
   const [formData, setFormData] = useState({
     weight: "",
+    length: "",
     width: "",
-    height: "",
-    depth: "",
-    unitOfMeasure: "",
+    weightUnit: "",
+    dimensionUnit: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -23,37 +23,43 @@ function ProductDetailsForm() {
 
   // --- Si es edición, cargar detalles existentes ---
   useEffect(() => {
-    if (!isEdit) return; // si es agregar, no cargar
+    if (!isEdit) return;
+
     fetch(`http://localhost:8080/api/products/${id}/details`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => {
+      .then((res) => {
         if (res.status === 404) return null;
         if (!res.ok) throw new Error("Error al obtener detalles");
         return res.json();
       })
-      .then(data => {
-        if (data) setFormData({
-          weight: data.weight,
-          width: data.width,
-          height: data.height,
-          depth: data.depth,
-          unitOfMeasure: data.unitOfMeasure,
+      .then((data) => {
+        if (!data) return;
+
+        setFormData({
+          weight: data.weight ?? "",
+          length: data.length ?? "",
+          width: data.width ?? "",
+          weightUnit: data.weightUnit ?? "",
+          dimensionUnit: data.dimensionUnit ?? "",
         });
       })
-      .catch(err => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        setError(err.message || "Error al obtener detalles");
+      });
   }, [id, token, isEdit]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    const numericFields = ["weight", "width", "height", "depth"];
+    const numericFields = ["weight", "length", "width"];
     if (numericFields.includes(name)) {
       if (value === "" || /^[0-9]*\.?[0-9]*$/.test(value)) {
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData((prev) => ({ ...prev, [name]: value }));
       }
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -61,15 +67,16 @@ function ProductDetailsForm() {
     e.preventDefault();
     setError(null);
 
-    // --- Validación de campos obligatorios ---
-    const { weight, width, height, depth, unitOfMeasure } = formData;
-    if (!weight || !width || !height || !depth || !unitOfMeasure) {
+    const { weight, length, width, weightUnit, dimensionUnit } = formData;
+
+    // --- Validación obligatorios ---
+    if (!weight || !length || !width || !weightUnit || !dimensionUnit) {
       setError("Todos los campos son obligatorios");
       return;
     }
 
-    // --- Validación de números positivos ---
-    if (parseFloat(weight) <= 0 || parseFloat(width) <= 0 || parseFloat(height) <= 0 || parseFloat(depth) <= 0) {
+    // --- Validación positivos ---
+    if (parseFloat(weight) <= 0 || parseFloat(length) <= 0 || parseFloat(width) <= 0) {
       setError("Los valores numéricos deben ser mayores que cero");
       return;
     }
@@ -84,21 +91,28 @@ function ProductDetailsForm() {
       },
       body: JSON.stringify({
         weight: parseFloat(weight),
+        length: parseFloat(length),
         width: parseFloat(width),
-        height: parseFloat(height),
-        depth: parseFloat(depth),
-        unitOfMeasure,
+        weightUnit,
+        dimensionUnit,
       }),
     })
       .then(async (res) => {
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
         if (!res.ok) {
-          throw new Error(data?.backendMessage || data?.message || "Error al guardar detalles técnicos");
+          const msg =
+            data?.backendMessage ||
+            data?.message ||
+            data?.details ||
+            data?.detail ||
+            data?.title ||
+            "Error al guardar detalles técnicos";
+          throw new Error(msg);
         }
         return data;
       })
       .then(() => navigate(`/products/${id}`))
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   };
 
@@ -115,6 +129,26 @@ function ProductDetailsForm() {
           onChange={handleChange}
           style={{ marginBottom: "1rem" }}
         />
+
+        <CFormInput
+          label="Unidad de Peso (kg, g, lb...)"
+          name="weightUnit"
+          type="text"
+          value={formData.weightUnit}
+          onChange={handleChange}
+          style={{ marginBottom: "1rem" }}
+        />
+
+        <CFormInput
+          label="Largo"
+          name="length"
+          type="text"
+          inputMode="decimal"
+          value={formData.length}
+          onChange={handleChange}
+          style={{ marginBottom: "1rem" }}
+        />
+
         <CFormInput
           label="Ancho"
           name="width"
@@ -124,29 +158,12 @@ function ProductDetailsForm() {
           onChange={handleChange}
           style={{ marginBottom: "1rem" }}
         />
+
         <CFormInput
-          label="Alto"
-          name="height"
+          label="Unidad de Dimensión (cm, m, in...)"
+          name="dimensionUnit"
           type="text"
-          inputMode="decimal"
-          value={formData.height}
-          onChange={handleChange}
-          style={{ marginBottom: "1rem" }}
-        />
-        <CFormInput
-          label="Profundidad"
-          name="depth"
-          type="text"
-          inputMode="decimal"
-          value={formData.depth}
-          onChange={handleChange}
-          style={{ marginBottom: "1rem" }}
-        />
-        <CFormInput
-          label="Unidad de Medida"
-          name="unitOfMeasure"
-          type="text"
-          value={formData.unitOfMeasure}
+          value={formData.dimensionUnit}
           onChange={handleChange}
           style={{ marginBottom: "1rem" }}
         />
@@ -157,7 +174,9 @@ function ProductDetailsForm() {
           <CButton type="submit" color="primary" disabled={loading}>
             {loading ? "Guardando..." : "Guardar"}
           </CButton>
-          <CButton color="secondary" onClick={() => navigate(`/products/${id}`)}>Cancelar</CButton>
+          <CButton color="secondary" onClick={() => navigate(`/products/${id}`)} disabled={loading}>
+            Cancelar
+          </CButton>
         </div>
       </CForm>
     </div>
