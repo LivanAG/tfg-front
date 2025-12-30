@@ -85,18 +85,26 @@ function InventoryMovementCreate() {
 
   // ---------- Validación FRONT (solo errores generales, en orden) ----------
   const validateBeforeSubmit = () => {
+    // 0) almacén
     if (!warehouse) {
       setError("Debes seleccionar un almacén.");
       return false;
     }
 
+    // ✅ 1) documento de referencia obligatorio
+    if (!referenceDocument || !referenceDocument.trim()) {
+      setError("El documento de referencia es obligatorio.");
+      return false;
+    }
+
+    // 2) producto seleccionado en todas las filas
     const missingProduct = details.some((d) => !d.product?.value);
     if (missingProduct) {
       setError("Debes seleccionar un producto en cada línea.");
       return false;
     }
 
-    // ✅ Duplicados (por seguridad, aunque ya bloqueamos en el select)
+    // 3) no duplicados
     const seen = new Set();
     for (let i = 0; i < details.length; i++) {
       const id = details[i]?.product?.value;
@@ -109,6 +117,7 @@ function InventoryMovementCreate() {
       seen.add(id);
     }
 
+    // 4) cantidades > 0
     const badQty = details
       .map((d, i) => ({ d, i }))
       .filter(({ d }) => {
@@ -126,6 +135,7 @@ function InventoryMovementCreate() {
       return false;
     }
 
+    // 5) costos (según tipo)
     if (movementType === "IN") {
       const badCost = details
         .map((d, i) => ({ d, i }))
@@ -207,14 +217,14 @@ function InventoryMovementCreate() {
   const handleDetailChange = (index, field, value) => {
     const updated = [...details];
 
-    // ✅ Bloquear producto duplicado en otra línea
+    // Bloquear producto duplicado en otra línea
     if (field === "product") {
       const newId = value?.value;
       if (newId != null) {
         const duplicated = details.some((d, i) => i !== index && d?.product?.value === newId);
         if (duplicated) {
           setError(`El producto "${value.label}" ya está añadido. Elige otro.`);
-          return; // no actualiza la línea
+          return;
         }
       }
     }
@@ -237,7 +247,7 @@ function InventoryMovementCreate() {
 
     const dto = {
       movementType,
-      referenceDocument,
+      referenceDocument: referenceDocument.trim(),
       note,
       warehouseId: warehouse.value,
       entryDetails:
@@ -282,14 +292,15 @@ function InventoryMovementCreate() {
           throw new Error(humanizeBackendError(data));
         }
 
+        // ✅ Redirigir al listado
+        navigate("/movements", { replace: true });
         return data;
       })
-      .then(() => navigate("/inventory-movements"))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   };
 
-  // ✅ Opcional: lista de productos disponibles por línea (quita los usados en otras líneas)
+  // lista de productos disponibles por línea (quita los usados en otras líneas)
   const getOptionsForRow = (rowIndex) => {
     const usedIds = new Set(
       details
@@ -319,6 +330,7 @@ function InventoryMovementCreate() {
               onChange={(opt) => setMovementType(opt.value)}
             />
           </CCol>
+
           <CCol md={4}>
             <CFormInput
               label="Documento de Referencia"
@@ -326,6 +338,7 @@ function InventoryMovementCreate() {
               onChange={(e) => setReferenceDocument(e.target.value)}
             />
           </CCol>
+
           <CCol md={4}>
             <label>Almacén</label>
             <Select
@@ -354,7 +367,7 @@ function InventoryMovementCreate() {
             <CCol md={3}>
               <label>Producto</label>
               <Select
-                options={getOptionsForRow(i)}   // ✅ evita duplicados en el dropdown
+                options={getOptionsForRow(i)}
                 value={d.product}
                 onChange={(val) => handleDetailChange(i, "product", val)}
               />
@@ -365,9 +378,7 @@ function InventoryMovementCreate() {
                 type="number"
                 label="Cantidad"
                 value={d.quantity}
-                onChange={(e) =>
-                  handleDetailChange(i, "quantity", e.target.value)
-                }
+                onChange={(e) => handleDetailChange(i, "quantity", e.target.value)}
               />
             </CCol>
 
@@ -378,9 +389,7 @@ function InventoryMovementCreate() {
                     type="number"
                     label="Costo Unitario"
                     value={d.unitCost}
-                    onChange={(e) =>
-                      handleDetailChange(i, "unitCost", e.target.value)
-                    }
+                    onChange={(e) => handleDetailChange(i, "unitCost", e.target.value)}
                   />
                 </CCol>
 
@@ -388,9 +397,7 @@ function InventoryMovementCreate() {
                   <CFormInput
                     label="Lote"
                     value={d.lotNumber}
-                    onChange={(e) =>
-                      handleDetailChange(i, "lotNumber", e.target.value)
-                    }
+                    onChange={(e) => handleDetailChange(i, "lotNumber", e.target.value)}
                   />
                 </CCol>
 
@@ -399,9 +406,7 @@ function InventoryMovementCreate() {
                     type="date"
                     label="Vencimiento"
                     value={d.expirationDate}
-                    onChange={(e) =>
-                      handleDetailChange(i, "expirationDate", e.target.value)
-                    }
+                    onChange={(e) => handleDetailChange(i, "expirationDate", e.target.value)}
                   />
                 </CCol>
               </>
@@ -413,9 +418,7 @@ function InventoryMovementCreate() {
                   type="number"
                   label="Precio Unitario Venta"
                   value={d.sellPriceUnit}
-                  onChange={(e) =>
-                    handleDetailChange(i, "sellPriceUnit", e.target.value)
-                  }
+                  onChange={(e) => handleDetailChange(i, "sellPriceUnit", e.target.value)}
                 />
               </CCol>
             )}
@@ -438,10 +441,7 @@ function InventoryMovementCreate() {
           <CButton type="submit" color="primary" disabled={loading}>
             {loading ? "Guardando..." : "Guardar Movimiento"}
           </CButton>
-          <CButton
-            color="secondary"
-            onClick={() => navigate("/inventory-movements")}
-          >
+          <CButton color="secondary" onClick={() => navigate("/movements")}>
             Cancelar
           </CButton>
         </div>

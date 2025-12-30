@@ -14,7 +14,7 @@ import {
 import CIcon from '@coreui/icons-react'
 import {logout} from '../../utils/auth'
 
-import avatar8 from './../../assets/images/avatars/8.jpg'
+
 import avatar10 from './../../assets/images/avatars/10.png'
 const AppHeaderDropdown = () => {
   return (

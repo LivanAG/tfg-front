@@ -10,7 +10,7 @@ const ProductsTecnicalsDetail = React.lazy(() => import('./views/products/Produc
 
 //Categories
 const Categories = React.lazy(() => import('./views/categories/Categories'))
-
+const CategoryCreate = React.lazy(() => import('./views/categories/CategoryCreate'))
 
 //Warehouse
 const WareHouseList = React.lazy(() => import('./views/warehouse/WareHouseList'))
@@ -55,6 +55,8 @@ const routes = [
 
   // Categories
   { path: '/categories', name: 'Categories', element: Categories },
+  { path: '/category/create', name: 'CategoryCreate', element: CategoryCreate },
+
   
   
   // Warehouse

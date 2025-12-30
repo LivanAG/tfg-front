@@ -13,7 +13,7 @@ import CIcon from '@coreui/icons-react'
 
 import { AppSidebarNav } from './AppSidebarNav'
 
-import milogo from  'src/assets/brand/milogo3.png'
+import milogo from  'src/assets/brand/milogo.png'
 
 
 // sidebar nav config
