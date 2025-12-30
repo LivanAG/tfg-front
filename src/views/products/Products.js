@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell,
-  CPagination, CPaginationItem, CFormInput, CButton, CFormSelect
+  CPagination, CPaginationItem, CFormInput, CButton, CFormSelect, CAlert
 } from "@coreui/react";
 import { useNavigate } from "react-router-dom";
 
 function ProductsList() {
   const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]); // ✅ Guardar categorías
+  const [categories, setCategories] = useState([]);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -21,12 +21,15 @@ function ProductsList() {
   const itemsPerPage = 10;
 
   const [selectedProducts, setSelectedProducts] = useState([]);
-  const navigate = useNavigate();
+  const [errorMessage, setErrorMessage] = useState("");
 
+  const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  // 🔹 Fetch productos
+  // 🔹 Fetch productos (con manejo de errores tipo Categories)
   const fetchProducts = () => {
+    setErrorMessage("");
+
     const params = new URLSearchParams();
     params.append("page", currentPage - 1);
     params.append("size", itemsPerPage);
@@ -42,25 +45,63 @@ function ProductsList() {
         Authorization: `Bearer ${token}`,
       },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const msg =
+            data?.backendMessage ||
+            data?.message ||
+            data?.details ||
+            data?.detail ||
+            data?.title ||
+            "Error al obtener productos";
+
+          throw new Error(msg);
+        }
+
+        return data;
+      })
+      .then((data) => {
         setProducts(data?.content || []);
         setTotalPages(data?.totalPages || 0);
         setTotalElements(data?.totalElements || 0);
         setSelectedProducts([]);
       })
-      .catch(err => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        setErrorMessage(err.message || "Error al obtener productos");
+      });
   };
 
-  // 🔹 Fetch categorías
+  // 🔹 Fetch categorías (con manejo de errores)
   const fetchCategories = () => {
     fetch(`http://localhost:8080/api/categories`, {
       method: "GET",
-      headers: { "Authorization": `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}` },
     })
-      .then(res => res.json())
-      .then(data => setCategories(data || []))
-      .catch(err => console.error(err));
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const msg =
+            data?.backendMessage ||
+            data?.message ||
+            data?.details ||
+            data?.detail ||
+            data?.title ||
+            "Error al obtener categorías";
+
+          throw new Error(msg);
+        }
+
+        return data;
+      })
+      .then((data) => setCategories(data || []))
+      .catch((err) => {
+        console.error(err);
+        setErrorMessage(err.message || "Error al obtener categorías");
+      });
   };
 
   useEffect(() => {
@@ -71,8 +112,8 @@ function ProductsList() {
 
   // 🔹 Selección de productos
   const handleSelect = (id) => {
-    setSelectedProducts(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    setSelectedProducts((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
     );
   };
 
@@ -80,19 +121,46 @@ function ProductsList() {
     if (selectedProducts.length === (products?.length || 0)) {
       setSelectedProducts([]);
     } else {
-      setSelectedProducts(products.map(p => p.id));
+      setSelectedProducts(products.map((p) => p.id));
     }
   };
 
+  // 🔹 Eliminar seleccionados (con manejo de excepciones)
   const handleDeleteSelected = () => {
+    setErrorMessage("");
+
     if (!window.confirm("¿Estás seguro de eliminar los productos seleccionados?")) return;
-    fetch("http://localhost:8080/products/delete-multiple", {
+
+    fetch("http://localhost:8080/api/products/delete-multiple", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify(selectedProducts),
     })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const msg =
+            data?.backendMessage ||
+            data?.message ||
+            data?.details ||
+            data?.detail ||
+            data?.title ||
+            "Error eliminando productos";
+
+          throw new Error(msg);
+        }
+
+        return;
+      })
       .then(() => fetchProducts())
-      .catch(err => console.error(err));
+      .catch((err) => {
+        console.error(err);
+        setErrorMessage(err.message || "Error eliminando productos");
+      });
   };
 
   // 🔹 Paginación UI
@@ -112,6 +180,17 @@ function ProductsList() {
     <div>
       <h2>Productos</h2>
 
+      {errorMessage && (
+        <CAlert
+          color="danger"
+          dismissible
+          onClose={() => setErrorMessage("")}
+          style={{ marginBottom: "1rem" }}
+        >
+          {errorMessage}
+        </CAlert>
+      )}
+
       {/* 🔹 Filtros */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "1rem" }}>
         <CFormInput
@@ -126,13 +205,12 @@ function ProductsList() {
           value={sku}
           onChange={(e) => setSku(e.target.value)}
         />
-        <CFormSelect
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
+        <CFormSelect value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
           <option value="">Todas las categorías</option>
-          {categories.map(cat => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
           ))}
         </CFormSelect>
       </div>
@@ -149,14 +227,17 @@ function ProductsList() {
         )}
       </div>
 
-      {/* 🔹 Tabla de productos */}
+      {/* 🔹 Tabla */}
       <CTable hover>
         <CTableHead>
           <CTableRow>
             <CTableHeaderCell>
               <input
                 type="checkbox"
-                checked={selectedProducts.length === (products?.length || 0) && (products?.length || 0) > 0}
+                checked={
+                  selectedProducts.length === (products?.length || 0) &&
+                  (products?.length || 0) > 0
+                }
                 onChange={handleSelectAll}
               />
             </CTableHeaderCell>
@@ -167,25 +248,39 @@ function ProductsList() {
             <CTableHeaderCell>Acciones</CTableHeaderCell>
           </CTableRow>
         </CTableHead>
+
         <CTableBody>
-          {products.length > 0 ? products.map(p => (
-            <CTableRow key={p.id}>
-              <CTableDataCell>
-                <input type="checkbox" checked={selectedProducts.includes(p.id)} onChange={() => handleSelect(p.id)} />
-              </CTableDataCell>
-              <CTableDataCell>{p.sku}</CTableDataCell>
-              <CTableDataCell>{p.name}</CTableDataCell>
-              <CTableDataCell>{p.barcode}</CTableDataCell>
-              <CTableDataCell>{p.categoryName}</CTableDataCell>
-              <CTableDataCell>
-                <CButton color="primary" size="sm" disabled={selectedProducts.length >= 1} onClick={() => navigate(`/products/${p.id}`)}>
-                  Detalles
-                </CButton>
-              </CTableDataCell>
-            </CTableRow>
-          )) : (
+          {products.length > 0 ? (
+            products.map((p) => (
+              <CTableRow key={p.id}>
+                <CTableDataCell>
+                  <input
+                    type="checkbox"
+                    checked={selectedProducts.includes(p.id)}
+                    onChange={() => handleSelect(p.id)}
+                  />
+                </CTableDataCell>
+                <CTableDataCell>{p.sku}</CTableDataCell>
+                <CTableDataCell>{p.name}</CTableDataCell>
+                <CTableDataCell>{p.barcode}</CTableDataCell>
+                <CTableDataCell>{p.categoryName}</CTableDataCell>
+                <CTableDataCell>
+                  <CButton
+                    color="primary"
+                    size="sm"
+                    disabled={selectedProducts.length >= 1}
+                    onClick={() => navigate(`/products/${p.id}`)}
+                  >
+                    Detalles
+                  </CButton>
+                </CTableDataCell>
+              </CTableRow>
+            ))
+          ) : (
             <CTableRow>
-              <CTableDataCell colSpan={6} style={{ textAlign: "center" }}>No se encontraron productos.</CTableDataCell>
+              <CTableDataCell colSpan={6} style={{ textAlign: "center" }}>
+                No se encontraron productos.
+              </CTableDataCell>
             </CTableRow>
           )}
         </CTableBody>
@@ -194,23 +289,36 @@ function ProductsList() {
       {/* 🔹 Paginación */}
       <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
         <CPagination>
-          <CPaginationItem disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>Anterior</CPaginationItem>
+          <CPaginationItem disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>
+            Anterior
+          </CPaginationItem>
+
           {startPage > 1 && (
             <>
               <CPaginationItem onClick={() => setCurrentPage(1)}>1</CPaginationItem>
               {startPage > 2 && <span style={{ padding: "0 5px" }}>...</span>}
             </>
           )}
-          {pageNumbers.map(num => (
-            <CPaginationItem key={num} active={currentPage === num} onClick={() => setCurrentPage(num)}>{num}</CPaginationItem>
+
+          {pageNumbers.map((num) => (
+            <CPaginationItem key={num} active={currentPage === num} onClick={() => setCurrentPage(num)}>
+              {num}
+            </CPaginationItem>
           ))}
+
           {endPage < totalPages && (
             <>
               {endPage < totalPages - 1 && <span style={{ padding: "0 5px" }}>...</span>}
               <CPaginationItem onClick={() => setCurrentPage(totalPages)}>{totalPages}</CPaginationItem>
             </>
           )}
-          <CPaginationItem disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(currentPage + 1)}>Siguiente</CPaginationItem>
+
+          <CPaginationItem
+            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => setCurrentPage(currentPage + 1)}
+          >
+            Siguiente
+          </CPaginationItem>
         </CPagination>
       </div>
     </div>
