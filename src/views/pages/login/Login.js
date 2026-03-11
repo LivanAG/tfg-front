@@ -101,9 +101,9 @@ const Login = () => {
                         </CButton>
                       </CCol>
                       <CCol xs={6} className="text-right">
-                        <CButton color="link" className="px-0" disabled={loading}>
-                          Forgot password?
-                        </CButton>
+                        <Link to="/forgot-password" className="btn btn-link px-0" style={{ textDecoration: 'none' }}>
+                          ¿Olvidaste tu contraseña?
+                        </Link>
                       </CCol>
                     </CRow>
                   </CForm>

@@ -1,245 +1,123 @@
-import { useEffect, useState } from "react";
+import { useState, useCallback } from 'react'
 import {
   CTable, CTableHead, CTableBody, CTableRow, CTableHeaderCell, CTableDataCell,
-  CPagination, CPaginationItem, CFormInput, CButton, CFormSelect, CAlert
-} from "@coreui/react";
-import { useNavigate } from "react-router-dom";
+  CFormInput, CButton, CFormSelect, CAlert,
+} from '@coreui/react'
+import { useNavigate } from 'react-router-dom'
+import { apiFetch } from '../../services/api'
+import { usePagination } from '../../hooks/usePagination'
+import Pagination from '../../components/myComponents/Pagination'
+import { useEffect } from 'react'
+
+const ITEMS_PER_PAGE = 10
 
 function ProductsList() {
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalElements, setTotalElements] = useState(0);
+  const navigate = useNavigate()
 
-  // Filtros
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sku, setSku] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [sku, setSku] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [selectedProducts, setSelectedProducts] = useState([])
+  const [errorMessage, setErrorMessage] = useState('')
 
-  // Paginación
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const fetchFn = useCallback(
+    (page) =>
+      apiFetch(
+        `/api/products/paged?page=${page - 1}&size=${ITEMS_PER_PAGE}` +
+          (searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '') +
+          (sku ? `&sku=${encodeURIComponent(sku)}` : '') +
+          (categoryId ? `&categoryId=${categoryId}` : '')
+      ),
+    [searchTerm, sku, categoryId]
+  )
 
-  const [selectedProducts, setSelectedProducts] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
+  const { data: products, totalPages, currentPage, setCurrentPage, error, setError } = usePagination({
+    fetchFn,
+    deps: [searchTerm, sku, categoryId],
+  })
 
-  const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-
-  // 🔹 Fetch productos (con manejo de errores tipo Categories)
-  const fetchProducts = () => {
-    setErrorMessage("");
-
-    const params = new URLSearchParams();
-    params.append("page", currentPage - 1);
-    params.append("size", itemsPerPage);
-
-    if (searchTerm) params.append("search", searchTerm);
-    if (sku) params.append("sku", sku);
-    if (categoryId) params.append("categoryId", categoryId);
-
-    fetch(`http://localhost:8080/api/products/paged?${params.toString()}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          const msg =
-            data?.backendMessage ||
-            data?.message ||
-            data?.details ||
-            data?.detail ||
-            data?.title ||
-            "Error al obtener productos";
-
-          throw new Error(msg);
-        }
-
-        return data;
-      })
-      .then((data) => {
-        setProducts(data?.content || []);
-        setTotalPages(data?.totalPages || 0);
-        setTotalElements(data?.totalElements || 0);
-        setSelectedProducts([]);
-      })
-      .catch((err) => {
-        console.error(err);
-        setErrorMessage(err.message || "Error al obtener productos");
-      });
-  };
-
-  // 🔹 Fetch categorías (con manejo de errores)
-  const fetchCategories = () => {
-    fetch(`http://localhost:8080/api/categories`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          const msg =
-            data?.backendMessage ||
-            data?.message ||
-            data?.details ||
-            data?.detail ||
-            data?.title ||
-            "Error al obtener categorías";
-
-          throw new Error(msg);
-        }
-
-        return data;
-      })
-      .then((data) => setCategories(data || []))
-      .catch((err) => {
-        console.error(err);
-        setErrorMessage(err.message || "Error al obtener categorías");
-      });
-  };
+  // Combinar errores del hook con errores de acciones
+  const displayError = errorMessage || error
 
   useEffect(() => {
-    fetchCategories();
-    fetchProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, searchTerm, sku, categoryId]);
+    apiFetch('/api/categories')
+      .then((data) => setCategories(data || []))
+      .catch((err) => console.error(err))
+  }, [])
 
-  // 🔹 Selección de productos
+  // Limpiar selected cuando cambian los datos
+  useEffect(() => {
+    setSelectedProducts([])
+  }, [products])
+
   const handleSelect = (id) => {
     setSelectedProducts((prev) =>
       prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
-  };
+    )
+  }
 
   const handleSelectAll = () => {
-    if (selectedProducts.length === (products?.length || 0)) {
-      setSelectedProducts([]);
-    } else {
-      setSelectedProducts(products.map((p) => p.id));
-    }
-  };
-
-  // 🔹 Eliminar seleccionados (con manejo de excepciones)
-  const handleDeleteSelected = () => {
-    setErrorMessage("");
-
-    if (!window.confirm("¿Estás seguro de eliminar los productos seleccionados?")) return;
-
-    fetch("http://localhost:8080/api/products/delete-multiple", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(selectedProducts),
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok) {
-          const msg =
-            data?.backendMessage ||
-            data?.message ||
-            data?.details ||
-            data?.detail ||
-            data?.title ||
-            "Error eliminando productos";
-
-          throw new Error(msg);
-        }
-
-        return;
-      })
-      .then(() => fetchProducts())
-      .catch((err) => {
-        console.error(err);
-        setErrorMessage(err.message || "Error eliminando productos");
-      });
-  };
-
-  // 🔹 Paginación UI
-  const pageNumbers = [];
-  const maxVisible = 5;
-  let startPage = Math.max(currentPage - Math.floor(maxVisible / 2), 1);
-  let endPage = startPage + maxVisible - 1;
-  if (endPage > totalPages) {
-    endPage = totalPages;
-    startPage = Math.max(endPage - maxVisible + 1, 1);
+    setSelectedProducts(
+      selectedProducts.length === products.length ? [] : products.map((p) => p.id)
+    )
   }
-  for (let i = startPage; i <= endPage; i++) pageNumbers.push(i);
 
-  useEffect(() => setCurrentPage(1), [searchTerm, sku, categoryId]);
+  const handleDeleteSelected = async () => {
+    if (!window.confirm('¿Estás seguro de eliminar los productos seleccionados?')) return
+    setErrorMessage('')
+    try {
+      await apiFetch('/api/products/delete-multiple', {
+        method: 'POST',
+        body: JSON.stringify(selectedProducts),
+      })
+      // Forzar recarga cambiando filtro (truco: resetear página)
+      setCurrentPage(1)
+      setSelectedProducts([])
+    } catch (err) {
+      setErrorMessage(err.message || 'Error eliminando productos')
+    }
+  }
+
+  const allSelected = products.length > 0 && selectedProducts.length === products.length
 
   return (
     <div>
       <h2>Productos</h2>
 
-      {errorMessage && (
-        <CAlert
-          color="danger"
-          dismissible
-          onClose={() => setErrorMessage("")}
-          style={{ marginBottom: "1rem" }}
-        >
-          {errorMessage}
+      {displayError && (
+        <CAlert color="danger" dismissible onClose={() => { setErrorMessage(''); setError('') }} style={{ marginBottom: '1rem' }}>
+          {displayError}
         </CAlert>
       )}
 
-      {/* 🔹 Filtros */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "1rem" }}>
-        <CFormInput
-          type="text"
-          placeholder="Buscar por nombre..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <CFormInput
-          type="text"
-          placeholder="Buscar por SKU..."
-          value={sku}
-          onChange={(e) => setSku(e.target.value)}
-        />
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+        <CFormInput placeholder="Buscar por nombre..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <CFormInput placeholder="Buscar por SKU..." value={sku} onChange={(e) => setSku(e.target.value)} />
         <CFormSelect value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
           <option value="">Todas las categorías</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.name}
-            </option>
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </CFormSelect>
       </div>
 
-      {/* 🔹 Acciones */}
-      <div style={{ marginBottom: "1rem", display: "flex", gap: "10px" }}>
-        <CButton color="success" size="sm" onClick={() => navigate("/products/create")}>
+      <div style={{ marginBottom: '1rem', display: 'flex', gap: '10px' }}>
+        <CButton color="success" size="sm" onClick={() => navigate('/products/create')}>
           Crear Producto
         </CButton>
         {selectedProducts.length > 0 && (
           <CButton color="danger" size="sm" onClick={handleDeleteSelected}>
-            Eliminar seleccionados
+            Eliminar seleccionados ({selectedProducts.length})
           </CButton>
         )}
       </div>
 
-      {/* 🔹 Tabla */}
       <CTable hover>
         <CTableHead>
           <CTableRow>
             <CTableHeaderCell>
-              <input
-                type="checkbox"
-                checked={
-                  selectedProducts.length === (products?.length || 0) &&
-                  (products?.length || 0) > 0
-                }
-                onChange={handleSelectAll}
-              />
+              <input type="checkbox" checked={allSelected} onChange={handleSelectAll} />
             </CTableHeaderCell>
             <CTableHeaderCell>SKU</CTableHeaderCell>
             <CTableHeaderCell>Nombre</CTableHeaderCell>
@@ -248,29 +126,19 @@ function ProductsList() {
             <CTableHeaderCell>Acciones</CTableHeaderCell>
           </CTableRow>
         </CTableHead>
-
         <CTableBody>
           {products.length > 0 ? (
             products.map((p) => (
               <CTableRow key={p.id}>
                 <CTableDataCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedProducts.includes(p.id)}
-                    onChange={() => handleSelect(p.id)}
-                  />
+                  <input type="checkbox" checked={selectedProducts.includes(p.id)} onChange={() => handleSelect(p.id)} />
                 </CTableDataCell>
                 <CTableDataCell>{p.sku}</CTableDataCell>
                 <CTableDataCell>{p.name}</CTableDataCell>
                 <CTableDataCell>{p.barcode}</CTableDataCell>
                 <CTableDataCell>{p.categoryName}</CTableDataCell>
                 <CTableDataCell>
-                  <CButton
-                    color="primary"
-                    size="sm"
-                    disabled={selectedProducts.length >= 1}
-                    onClick={() => navigate(`/products/${p.id}`)}
-                  >
+                  <CButton color="primary" size="sm" disabled={selectedProducts.length >= 1} onClick={() => navigate('/products/' + p.id)}>
                     Detalles
                   </CButton>
                 </CTableDataCell>
@@ -278,7 +146,7 @@ function ProductsList() {
             ))
           ) : (
             <CTableRow>
-              <CTableDataCell colSpan={6} style={{ textAlign: "center" }}>
+              <CTableDataCell colSpan={6} style={{ textAlign: 'center' }}>
                 No se encontraron productos.
               </CTableDataCell>
             </CTableRow>
@@ -286,43 +154,9 @@ function ProductsList() {
         </CTableBody>
       </CTable>
 
-      {/* 🔹 Paginación */}
-      <div style={{ display: "flex", justifyContent: "center", marginTop: "1rem" }}>
-        <CPagination>
-          <CPaginationItem disabled={currentPage === 1} onClick={() => setCurrentPage(currentPage - 1)}>
-            Anterior
-          </CPaginationItem>
-
-          {startPage > 1 && (
-            <>
-              <CPaginationItem onClick={() => setCurrentPage(1)}>1</CPaginationItem>
-              {startPage > 2 && <span style={{ padding: "0 5px" }}>...</span>}
-            </>
-          )}
-
-          {pageNumbers.map((num) => (
-            <CPaginationItem key={num} active={currentPage === num} onClick={() => setCurrentPage(num)}>
-              {num}
-            </CPaginationItem>
-          ))}
-
-          {endPage < totalPages && (
-            <>
-              {endPage < totalPages - 1 && <span style={{ padding: "0 5px" }}>...</span>}
-              <CPaginationItem onClick={() => setCurrentPage(totalPages)}>{totalPages}</CPaginationItem>
-            </>
-          )}
-
-          <CPaginationItem
-            disabled={currentPage === totalPages || totalPages === 0}
-            onClick={() => setCurrentPage(currentPage + 1)}
-          >
-            Siguiente
-          </CPaginationItem>
-        </CPagination>
-      </div>
+      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
     </div>
-  );
+  )
 }
 
-export default ProductsList;
+export default ProductsList
