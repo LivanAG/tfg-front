@@ -3,11 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copiar package.json y lock
-COPY package.json package-lock.json ./
+# Copiar solo package.json
+COPY package.json ./
 
 # Instalar dependencias
-RUN npm ci
+RUN npm install
 
 # Copiar código
 COPY . .
@@ -26,9 +26,5 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Puerto
 EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-  CMD wget --quiet --tries=1 --spider http://localhost/index.html || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
