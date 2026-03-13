@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Recibir variable de entorno para la URL del API
+ARG VITE_API_URL=http://localhost:8080
+
 # Copiar solo package.json
 COPY package.json ./
 
@@ -12,8 +15,8 @@ RUN npm install
 # Copiar código
 COPY . .
 
-# Compilar con Vite
-RUN npm run build
+# Compilar con Vite (pasando la variable de entorno)
+RUN VITE_API_URL=$VITE_API_URL npm run build
 
 # Stage 2: Serve con Nginx
 FROM nginx:alpine
