@@ -42,7 +42,11 @@ export default defineConfig(() => {
     server: {
       port: 3001,
       proxy: {
-        // https://vitejs.dev/config/server-options.html
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '')
+        }
       },
     },
   }
