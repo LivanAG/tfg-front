@@ -2,6 +2,8 @@ import { CModal, CModalHeader, CModalTitle, CModalBody, CModalFooter, CButton, C
 import { useState, useEffect } from "react";
 
 function FilterModal({ visible, onClose, onApply, initialFilters = {} }) {
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  
   const [categories, setCategories] = useState([]);
   const [category, setCategory] = useState(initialFilters.category || "");
   const [minPrice, setMinPrice] = useState(initialFilters.minPrice || "");
@@ -24,7 +26,7 @@ function FilterModal({ visible, onClose, onApply, initialFilters = {} }) {
 
   const fetchFilters = (filters) => {
     const token = localStorage.getItem("token");
-    fetch("http://localhost:8080/bff/products/filters", {
+    fetch(`${BASE_URL}/bff/products/filters`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

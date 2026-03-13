@@ -16,6 +16,8 @@ import CIcon from "@coreui/icons-react";
 import { cilLockLocked, cilUser } from "@coreui/icons";
 
 const Register = () => {
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -70,7 +72,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:8080/auth/register-owner", {
+      const res = await fetch(`${BASE_URL}/auth/register-owner`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

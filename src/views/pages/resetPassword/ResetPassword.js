@@ -6,6 +6,7 @@ import {
 } from '@coreui/react'
 
 function ResetPassword() {
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = searchParams.get('token') || ''
@@ -22,7 +23,7 @@ function ResetPassword() {
       setTokenValid(false)
       return
     }
-    fetch('http://localhost:8080/auth/reset-password/validate?token=' + encodeURIComponent(token))
+    fetch(`${BASE_URL}/auth/reset-password/validate?token=` + encodeURIComponent(token))
       .then((res) => setTokenValid(res.ok))
       .catch(() => setTokenValid(false))
   }, [token])
@@ -37,7 +38,7 @@ function ResetPassword() {
 
     setLoading(true)
     try {
-      const res = await fetch('http://localhost:8080/auth/reset-password', {
+      const res = await fetch(`${BASE_URL}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword }),

@@ -6,6 +6,8 @@ import {
 } from '@coreui/react'
 
 function ForgotPassword() {
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+  
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -18,7 +20,7 @@ function ForgotPassword() {
 
     setLoading(true)
     try {
-      const res = await fetch('http://localhost:8080/auth/forgot-password', {
+      const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
